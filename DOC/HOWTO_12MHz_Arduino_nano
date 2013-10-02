@@ -1,0 +1,102 @@
+To work with Arduino Nano with 12MHz clock
+
+
+1. Edit ./hardware/arduino/boards.txt file, add new section
+
+
+##############################################################
+
+nano328_12.name=Arduino Nano w/ ATmega328 12MHz
+
+nano328_12.upload.protocol=arduino
+nano328_12.upload.maximum_size=30720
+nano328_12.upload.speed=57600
+
+nano328_12.bootloader.low_fuses=0xFF
+nano328_12.bootloader.high_fuses=0xDA
+nano328_12.bootloader.extended_fuses=0x05
+nano328_12.bootloader.path=atmega
+nano328_12.bootloader.file=ATmegaBOOT_168_atmega328.hex
+nano328_12.bootloader.unlock_bits=0x3F
+nano328_12.bootloader.lock_bits=0x0F
+
+nano328_12.build.mcu=atmega328p
+nano328_12.build.f_cpu=12000000L
+nano328_12.build.core=arduino
+nano328_12.build.variant=eightanaloginputs
+
+##############################################################
+
+
+
+
+2. Edit ./libraries/SoftwareSerial/SoftwareSerial.cpp
+(source: http://wiblocks.luciani.org/docs/app-notes/software-serial.html )
+
+add  DELAY_TABLE as follows:
+
+#elif F_CPU == 12000000
+
+static const DELAY_TABLE PROGMEM table[] =
+{
+  //  baud    rxcenter   rxintra    rxstop        tx
+  { 115200,          1,       11,       11,        8, },
+  {  57600,          6,       26,       26,       23, },
+  {  38400,         14,       41,       42,       39, },
+  {  31250,         19,       51,       52,       49, },
+  {  28800,         23,       56,       56,       53, },
+  {  19200,         37,       86,       86,       83, },
+  {  14400,         52,      116,      116,      113, },
+  {   9600,         82,      175,      175,      173, },
+  {   4800,        172,      354,      354,      351, },
+  {   2400,        350,      711,      711,      708, },
+  {   1200,        707,     1425,     1425,     1422, },
+  {    300,       2850,     5711,     5711,     5708, },
+};
+
+const int XMIT_START_ADJUSTMENT = 5;
+
+
+3. Edit ./hardware/arduino/bootloaders/atmega/Makefile
+
+change "atmega328: AVR_FREQ = 16000000L"  ---> atmega328: AVR_FREQ = 12000000L  
+
+and also 
+
+# ?kraz? - changed opt level to fit under 2k
+OPTIMIZE   = -Os
+# OPTIMIZE   = -O2
+
+
+4. Modify ./hardware/arduino/bootloaders/atmega/ATmegaBOOT_168.c as described  here:  http://n0m1.com/2012/04/01/how-to-compiling-the-arduino-bootloader/
+
+
+	somewhere around line 584
+// ?kraz? -fixed EEWE bit definition missing in versions 1.6.7 and newer of the file /avr/eeprom.h
+// According to this issue reported in 2009: http://code.google.com/p/arduino/issues/detail?id=152&q=eewe
+#if defined(EEPE)
+                while(bit_is_set(EECR,EEPE));           //Wait for previous EEPROM writes to complete
+#else
+                while(bit_is_set(EECR,EEWE));           //Wait for previous EEPROM writes to complete
+#endif
+ 
+/*
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega1281__)
+                while(bit_is_set(EECR,EEPE));           //Wait for previous EEPROM writes to complete
+#else
+                while(bit_is_set(EECR,EEWE));           //Wait for previous EEPROM writes to complete
+#endif
+*/
+
+
+
+5. Recompile boot loader
+
+make atmega328
+
+
+New bootloader is ready to be programmed into Arduino Nano 12MHz board
+I use USBasp board ICSP
+
+
+73 de LZ1NY
